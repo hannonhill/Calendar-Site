@@ -1,11 +1,9 @@
-<<<<<<< HEAD
 # Calendar
 =======
 Calendar-Examples.csse
 ============================
 
 For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of database structure changes and updates to how Dynamic Metadata are created/stored.
->>>>>>> Updated examples, added Clean version, updated README
 
 Features include:
 
@@ -16,7 +14,6 @@ Features include:
 * Landing Page for events within a given year or month.
 * Repeatable events using daily, weekly, monthly and yearly options.
 * Multi-channel output for a variety of pages (XHTML, PDF, RSS, iCal, XML).
-<<<<<<< HEAD
 
 **Note:** For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
@@ -156,4 +153,3 @@ Note: It is recommended to publish the theme folder located at `/calendar-librar
 * Repeatable events.
 
 Note: Calendar-Clean.csse has no example events and is stripped of most customizations including headers, footers, and logos.
->>>>>>> Updated examples, added Clean version, updated README
