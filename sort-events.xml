@@ -1,0 +1,44 @@
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+
+  <xsl:template match="xhtml:head">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+  
+  <!-- Create the event listing by grabbing items from the un-ordered list generated using Velocity. -->
+  <xsl:template match="xhtml:div[@data-type='events']">
+    <xsl:copy>
+      <xsl:apply-templates select="@*"/>
+      <xsl:variable name="dataLimit">
+        <xsl:choose>
+          <xsl:when test="@data-limit != ''"><xsl:value-of select="@data-limit"/></xsl:when>
+          <xsl:otherwise/>
+        </xsl:choose>
+      </xsl:variable>
+
+      <xsl:apply-templates mode="eventsList" select="xhtml:p">
+        <!-- Sort the items -->
+        <xsl:sort order="ascending" select="@data-timestamp"/>
+        
+        <!-- Pass the limit, this needs to be done after the sorting, so pass it into the item template. -->
+        <xsl:with-param name="dataLimit" select="$dataLimit"/>
+      </xsl:apply-templates>
+    </xsl:copy>
+  </xsl:template>
+   
+  <!-- Display the item -->
+  <xsl:template match="xhtml:p" mode="eventsList">
+    <xsl:param name="dataLimit"/>
+    
+    <!-- Make sure the item falls within the  limit, if one exists. -->    
+    <xsl:if test="$dataLimit='' or position() &lt;= number($dataLimit)">
+      <xsl:copy-of select="."/>
+    </xsl:if>
+  </xsl:template>
+</xsl:stylesheet>

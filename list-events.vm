@@ -1,0 +1,496 @@
+## Define the category to include as a String.
+## Or, define multiple categories to include as an Array.
+###set ( $category = "Academics" )
+#set ( $category = ["Campus Events", "Academics", "Alumni", "Students", "Holidays"] )
+
+## Max events to display
+#set ( $limit = 7 )
+
+#*
+    Outputs the events listing.
+
+    Note:   An XSLT format will order this list at page render, so the list MUST 
+            be a <DIV> with the following attributes:
+
+            data-type="events"      - the XSLT format uses this to select and sort the list
+            data-limit="INTEGER"    - limits the items when the XSLT format outputs the sorted list
+    
+    @param  $events original events to loop through
+    @param  $start start date for the events
+    @param  $end end date for the events
+    @param  $limit how many events should be listed
+*#
+#macro (outputListing $events, $start, $end, $limit)
+    <div class="well homeCol eventsList">
+        <h3>HHU Events</h3>
+        <hr/>
+        <div class="conciseEvents" data-type="events" data-limit="${limit}">
+        ## Output all events that fall within the given range.
+        #outputEvents($events, $currCal, $endCal)
+        </div>
+    </div>
+#end
+
+#*
+    Outputs a single event occurrence
+
+    @param  $eventId the ID of the original event for lookup
+    @param  $start the date to display for the occurrence
+*#
+#macro (outputEvent $eventId, $start)
+    #set ($eventSDS = $eventDataHash.get($eventId))
+    #set ($startDate = $start)
+    
+    #set ($link = $eventSDS.get("link"))
+
+    #if ($eventSDS.get("title"))
+        #set ($title = $eventSDS.get("title"))
+    #else
+        #set ($title = $eventSDS.get("name"))
+    #end
+
+    #set ($titleText = $_EscapeTool.xml($title))
+    <p data-guid="${eventId}" data-timestamp="${startDate.getTime()}"><i class="icon-calendar">&#160;</i> <a href="${link}">${titleText}</a></p>
+#end
+
+#**********************************************************************
+    There should be no need to edit below this line.
+***********************************************************************#
+
+#set ($callingPage = $_XPathTool.selectSingleNode($contentRoot, "//calling-page/system-page"))
+#set ($callingPageType = $callingPage.getChild("system-data-structure").getAttribute("definition-path").value)
+
+#set ($callingPageSummary = "")
+#if ($callingPage.getChild("summary"))
+    #set ($callingPageSummary = $_EscapeTool.java($callingPage.getChild("summary").value))
+#end
+
+## Grab the current time.
+#set ($currTime = $_XPathTool.selectSingleNode($contentRoot, "/system-index-block/@current-time").value)
+#set ($currCal = $_DateTool.toCalendar($_DateTool.getDate($currTime)))
+
+## Lookup for the day checkboxes in the data definition.
+#set ($daysMap = {
+    "Sun":1, "Mon":2, "Tue":3, "Wed":4, "Thu":5, "Fri":6, "Sat":7
+})
+
+## Variable to hold the final events and event data.
+#set ($eventDataHash = {})
+
+## Set the start time to midnight.
+$currCal.set(9, 0)
+$currCal.set(10, 0)
+$currCal.set(12, 0)
+
+## Set an end point for the recurring events to 3 years from the current date.
+#set ($endCal = $_DateTool.toCalendar($currCal.getTime()))
+$endCal.add(1, 3)
+
+## Set the time to a minute before midnight.
+$endCal.set(9, 0)
+$endCal.set(10, 11)
+$endCal.set(12, 59)
+
+## Grab the categories to include based on the $category variable above.
+#set ($categoriesXpath = "")
+## If we're dealing with a non-empty array, loop through and create the XPath for each.
+## Else, we're dealing with a string containing a single category.
+#if ($category.getClass().getName().contains("Array") && $category.size() > 0)
+    #foreach ($c in $category)
+        #if ($foreach.index == 0)
+            #set ($categoriesXpath = "value = '${c}'")
+        #else
+            #set ($categoriesXpath = "${categoriesXpath} or value = '${c}'")
+        #end    
+    #end
+    #set ($categoriesXpath = "and (${categoriesXpath})")
+#elseif ($categories.getClass().getName().contains("String"))
+    #set ($categoriesXpath = "and (value = '${category.value}')")
+#end
+
+## Grab all single events after the current time, or recurring events that fall between the current time and the end time defined above.
+#set ($events = $_XPathTool.selectNodes($contentRoot, "/system-index-block//system-page[dynamic-metadata[name = 'categories' ${categoriesXpath}] and not(contains(path, '_cascade')) and (system-data-structure[starts > '${currTime}' or recurrence[frequency != '' and frequency != 'Once' and (ends = '' or (ends != '' and ends >= '${currTime}'))]])]"))
+
+#outputListing($events, $currCal, $endCal)
+
+#*
+    Outputs all events and their occurrences based on a given time range.
+    Calls the outputEvent macro to actually display the event.
+
+    @param  $events the original JDOM events list to loop over
+    @param  $begin the start of the range
+    @param  $end the end of the range
+*#
+#macro (outputEvents $events, $begin, $end)
+    #set ($beginDate = $begin.getTime())
+    #set ($endDate = $end.getTime())
+
+    #if ($events.size() < 1)
+        #set ($eventsList = [])
+    #else
+        #foreach ($event in $events)
+            #set ($event = $event.detach())
+            #set ($sds = $event.getChild("system-data-structure"))
+
+            #set ($eventData = {
+                "id": $event.getAttribute("id").value,
+                "title": $event.getChild("title").value,
+                "name": $event.getChild("name").value,
+                "link": $event.getChild("link").value,
+                "summary": $event.getChild("summary").value
+            })
+
+            ## Hold onto the important content for re-adding later.
+            ## Record the event in the lookup table.
+            #set ($_void = $eventDataHash.put($eventData.get("id"), $eventData))
+
+            ## Hold onto the original event start/end for reference.
+            #set ($_eventStart = $_DateTool.getDate($sds.getChild("starts").value))
+            #set ($_eventEnd = $_DateTool.getDate($sds.getChild("ends").value))
+
+            ## Create event start/end Date and Calendar objects for manipulation.
+            #set ($sDate = $_eventStart)
+            #set ($eDate = $_eventEnd)
+            #set ($sCal = $_DateTool.toCalendar($sDate))
+            #set ($eCal = $_DateTool.toCalendar($eDate))
+
+            ## Grab the difference in milliseconds between the start and end date. Used
+            ## for easily setting event end without needed to re-calculate the difference.
+            #set ($seMillisDiff = $_DateTool.difference($sDate, $eDate).getMilliseconds())
+
+            #set ($allDay = false)
+            #if ($sds.getChild("all-day").value != "")
+                #set ($allDay = true)
+            #end
+
+            ## Hold onto the recurrence information.
+            #set ($recurrence = $sds.getChild("recurrence"))
+            #set ($frequency = $recurrence.getChild("frequency").value)  
+            #set ($interval = $_MathTool.toInteger($recurrence.getChild("interval").value))
+            #set ($until = $recurrence.getChild("ends").value)
+
+            ## Are we adding a non-recurring or recurring event?
+            #if ($frequency == 'Once')
+                ## Add the single event if it falls on or after the begin date.
+                #if ($sCal.compareTo($begin) >= 0)
+                    #outputEvent($eventData.get("id"), $sDate)
+                #end
+            #else
+                ## Set the end of the recurrence.
+                ## If there is no recurrence end, use the end that was passed to the macro.
+                #if ($until != "")
+                    #set ($until = $_DateTool.getDate($until))
+                    #set ($uCal = $_DateTool.toCalendar($until))
+
+                    ## If the end is greater than what was passed to the macro, update the end.
+                    #if ($uCal.after($end))
+                        #set ($until = $endDate)
+                        #set ($uCal = $_DateTool.toCalendar($until))
+                    #end
+                #else
+                    #set ($until = $endDate)
+                    #set ($uCal = $_DateTool.toCalendar($until))
+                #end
+
+                ## Add an occurrence for each day+interval.
+                #if ($frequency == "Daily")
+                    ## Find the next possible ocurrence for this Daily event.
+                    #set ($sDate = "#findNextDailyOccurrence($sCal, $begin, $interval)")
+                    #set ($sDate = $_DateTool.getDate($sDate.trim()))
+                    #set ($sCal = $_DateTool.toCalendar($sDate))
+                    $eCal.setTimeInMillis($_MathTool.add($sDate.getTime(), $seMillisDiff))
+
+                    ## Limit for the psuedo while loop.
+                    #set ($diff = $_DateTool.difference($sDate, $until).getDays())
+
+                    #foreach ($d in [0..$diff])
+                        #if ($sDate.after($until))
+                            #break
+                        #end
+                        
+                        ## If we are within range, add the new start/end timestamps and add to the events array.
+                        #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                            #outputEvent($eventData.get("id"), $sDate)
+                        #end
+
+                        ## Increment the start date based chosen interval.                    
+                        $sCal.add(5, $interval)
+                        $eCal.add(5, $interval)
+                        $sDate.setTime($sCal.getTimeInMillis())
+                        $eDate.setTime($eCal.getTimeInMillis())
+                    #end
+                #elseif ($frequency == "Weekly")
+                    #set ($nextWeekInDays = $_MathTool.mul($interval, 7))
+                    
+                    #set ($days = $_XPathTool.selectNodes($recurrence, "day[count(value) > 0]/value"))                    
+
+                    ## Find the next possible ocurrence for this Weekly event.
+                    #set ($sDate = "#findNextWeeklyOccurrence($sCal, $begin, $interval, $days, $allDay)")
+                    #set ($sDate = $_DateTool.getDate($sDate.trim()))     
+
+                    #set ($sCal = $_DateTool.toCalendar($sDate))
+                    $eCal.setTimeInMillis($_MathTool.add($sDate.getTime(), $seMillisDiff))
+
+                    ## Limit for the psuedo while loop.
+                    #set ($diff = $_DateTool.difference($sDate, $until).getWeeks())
+
+                    ## Are we adding a single weekly occurrence, or multiple?
+                    #if ($days.size() < 1)                        
+                        #foreach ($d in [0..$diff])
+                            #if ($sDate.after($until))
+                                #break
+                            #end
+
+                            ## If we are within range, add the new start/end timestamps and add to the events array.
+                            #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                                #outputEvent($eventData.get("id"), $sDate)
+                            #end 
+
+                            ## Increment the start date based chosen interval.
+                            $sCal.add(5, $nextWeekInDays)
+                            $eCal.add(5, $nextWeekInDays)
+                            $sDate.setTime($sCal.getTimeInMillis())
+                            $eDate.setTime($eCal.getTimeInMillis())                     
+                        #end
+                    #else
+                        #foreach ($d in [0..$diff])
+                            #if ($sDate.after($until))
+                                #break
+                            #end
+
+                            ## Loop through each chosen day and add the occurrences.
+                            #foreach ($day in $days)
+                                #set ($newDate = $_MathTool.sub($daysMap.get($day.value), $sCal.get(7)))
+                                #set ($newDate = $_MathTool.add($sCal.get(5), $newDate))
+
+                                ## Set the start date to the difference in days plus current start
+                                $sCal.set(5, $newDate)
+
+                                #set ($sTimeInMillis = $sCal.getTimeInMillis())
+
+                                $eCal.setTimeInMillis($_MathTool.add($sTimeInMillis, $seMillisDiff))
+                                $sDate.setTime($sTimeInMillis)
+                                $eDate.setTime($eCal.getTimeInMillis())
+
+                                ## Only add occurrences that are after the actual start date.
+                                #if ($sDate.compareTo($_eventStart) >= 0)
+                                    ## If we are within range, add the new start/end timestamps and add to the events array.
+                                    #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                                        #outputEvent($eventData.get("id"), $sDate)
+                                    #end
+                                #end
+                            #end
+
+                            ## Increment the start date based chosen interval.
+                            $sCal.add(5, $nextWeekInDays)
+                            $eCal.add(5, $nextWeekInDays)                            
+                            $sDate.setTime($sCal.getTimeInMillis())
+                            $eDate.setTime($eCal.getTimeInMillis())
+                        #end
+                    #end
+                #elseif ($frequency == "Monthly")
+                    ## Find the next possible ocurrence for this Daily event.
+                    #set ($sDate = "#findNextMonthlyOccurrence($sCal, $begin, $interval)")
+                    #set ($sDate = $_DateTool.getDate($sDate.trim()))
+                    #set ($sCal = $_DateTool.toCalendar($sDate))
+                    $eCal.setTimeInMillis($_MathTool.add($sDate.getTime(), $seMillisDiff))
+
+                    ## Limit for the psuedo while loop.
+                    #set ($diff = $_DateTool.difference($sDate, $until).getMonths())
+
+                    #if ($recurrence.getChild("monthly-day").value == "day of the month")
+                        ## Add a monthly occurrence based on the original event's date.
+                        #set ($theDate = $sCal.get(5))
+                        #foreach ($d in [0..$diff])
+                            #if ($sDate.after($until))
+                                #break
+                            #end
+
+                            ## Ensure the date exists within the current month.
+                            #if ($sCal.get(5) == $theDate)
+                                ## If we are within range, add the new start/end timestamps and add to the events array.
+                                #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                                    #outputEvent($eventData.get("id"), $sDate)
+                                #end                                
+                            #end
+
+                            ## Increment the start date based chosen interval.
+                            $sCal.add(2, $interval)
+                            $sCal.set(5, $theDate)
+
+                            #set ($sTimeInMillis = $sCal.getTimeInMillis())
+
+                            $eCal.setTimeInMillis($_MathTool.add($sTimeInMillis, $seMillisDiff))
+
+                            $sDate.setTime($sTimeInMillis)
+                            $eDate.setTime($eCal.getTimeInMillis())
+                        #end
+                    #else
+                        ## Add a monthly occurrence based on the original event's day of the week.
+                        ## Determine the position of this day and week in the month (ie 1st, 2nd ...)
+                        #set ($theWeek = $sCal.get(8))
+                        #set ($theDay = $_MathTool.sub($sCal.get(7), 1))
+
+                        #foreach ($d in [0..$diff])
+                            #if ($sDate.after($until))
+                                #break
+                            #end
+
+                            ## If we are within range, add the new start/end timestamps and add to the events array.
+                            #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                                #outputEvent($eventData.get("id"), $sDate)
+                            #end
+
+                            ## Increment the start date based chosen interval and reset the day of week and week of month.
+                            $sCal.add(2, $interval)
+                            $sCal.set(7, $theDay)
+                            $sCal.set(8, $theWeek)
+
+                            #set ($sTimeInMillis = $sCal.getTimeInMillis())
+
+                            $eCal.setTimeInMillis($_MathTool.add($sTimeInMillis, $seMillisDiff))
+
+                            $sDate.setTime($sTimeInMillis)
+                            $eDate.setTime($eCal.getTimeInMillis())
+                        #end
+                    #end
+                #elseif ($frequency == "Yearly")
+                    ## Limit for the psuedo while loop.
+                    #set ($diff = $_DateTool.difference($sDate, $until).getYears())
+
+                    #foreach ($d in [0..$diff])
+                        #if ($sDate.after($until))
+                            #break
+                        #end
+
+                        ## If we are within range, add the new start/end timestamps and add to the events array.
+                        #if ($sDate.compareTo($beginDate) >= 0 && $sDate.compareTo($until) <= 0)
+                            #outputEvent($eventData.get("id"), $sDate)
+                        #end
+
+                        ## Increment the start year based chosen interval.
+                        $sCal.add(1, $interval)
+                        $eCal.add(1, $interval)
+
+                        $sDate.setTime($sCal.getTimeInMillis())
+                        $eDate.setTime($eCal.getTimeInMillis())
+                    #end
+                #end
+            #end
+        #end
+    #end
+#end
+
+#*
+    Finds the next daily occurrence of an event based on the event start date, a given date, and
+    defined interval.
+
+    @param  $eventStart the original start date of the event
+    @param  $afterDate the date in which the next occurrence falls after
+    @param  $interval the interval in which occurrences fall on
+*#
+#macro (findNextDailyOccurrence $eventStart, $afterDate, $interval)
+    #set ($nextOccurrence = $eventStart.getTime())
+ 
+    #set ($daysBeforeDate = $_DateTool.difference($eventStart, $afterDate).getDays())
+    #set ($occurrencesBeforeDate = $_MathTool.toInteger($_MathTool.div($daysBeforeDate, $interval)))
+    
+    #set ($numDays = $occurrencesBeforeDate + 1)
+    #set ($numDays = $_MathTool.mul($occurrencesBeforeDate, $interval))
+    
+    ## Increment to the next day using milliseconds (including interval) and
+    ## "return" the next occurrence timestamp  
+    $_MathTool.add($nextOccurrence, $_MathTool.mul(86400000, $numDays))
+#end
+
+#*
+    Finds the next weekly occurrence of an event based on the event start date, a given date, and
+    defined interval.
+
+    @param  $eventStart the original start date of the event
+    @param  $afterDate the date in which the next occurrence falls after
+    @param  $interval the interval in which occurrences fall on
+    @param  $days the days in which the weekly event falls on
+    @param  $allDay whether or not the event spans an entire day
+*#
+#macro (findNextWeeklyOccurrence $eventStart, $afterDate, $interval, $days, $allDay)
+    ## Record the day(s) the next occurrence needs to fall on while looping to find the next occurrence.
+    #set ($recurringDays = [])
+    #if ($days.size() < 1)
+        #set ($_void = $recurringDays.add($eventStart.get(7)))        
+    #else
+        #foreach ($d in $days)
+            #set ($_void = $recurringDays.add($daysMap.get($d.value)))
+        #end
+    #end
+
+    ## If the event is all day, reset the time to midnight.
+    #if ($allDay != "")
+        $afterDate.set(9, 0)
+        $afterDate.set(10, 0)
+        $afterDate.set(12, 0)
+    #end
+
+    #set ($aDate = $afterDate.getTime())
+    #set ($eDate = $eventStart.getTime())
+
+    ## Initialize the last occurrence to the event's start.
+    #set ($lastOccurrence = $_DateTool.toCalendar($eDate))
+
+    ## Find the number of weeks between the event's start and the afterDate.
+    #set ($weeksBeforeDate = $_DateTool.difference($eDate, $aDate).getWeeks())
+    #set ($weekOccurrencesBeforeDate = $_MathTool.toInteger($_MathTool.div($weeksBeforeDate, $interval)))
+    #set ($numWeeks = $_MathTool.mul($weekOccurrencesBeforeDate, $interval))
+
+    ## The last occurrence is the difference between the event start and afterDate, times the interval.
+    $lastOccurrence.add(3, $numWeeks)
+
+    ## If the last occurrence and afterDate call on the same week, increment a day.
+    #if ($_DateTool.difference($lastOccurrence.getTime(), $aDate).getWeeks() == 0)
+        $lastOccurrence.add(5, 1)
+    #end
+
+    ## Begin the next occurrence at the last occurrence.
+    #set ($nextOccurrence = $lastOccurrence)
+
+    ## Psuedo While loop to increment the nextOccurrence date until it is >= and 
+    ## within the allowed recurrence days for the event.
+    #set ($loopEnd = $_MathTool.mul(7, $interval))
+    #foreach ($i in [0..$loopEnd])
+        #if ($nextOccurrence.compareTo($afterDate) >= 0 && $recurringDays.contains($nextOccurrence.get(7)))
+            #break
+        #else
+            $nextOccurrence.add(5, 1)
+        #end
+    #end
+
+    ## "Return" the next occurrence timestamp
+    $nextOccurrence.getTimeInMillis()
+#end
+
+#*
+    Finds the next monthly occurrence of an event based on the event start date, a given date, and
+    defined interval.
+
+    @param  $eventStart the original start date of the event
+    @param  $afterDate the date in which the next occurrence falls after
+    @param  $interval the interval in which occurrences fall on
+*#
+#macro (findNextMonthlyOccurrence $eventStart, $afterDate, $interval)
+    #set ($nextOccurrence = $eventStart)
+    
+    #set ($aDate = $afterDate.getTime())
+    #set ($eDate = $eventStart.getTime())
+
+    #set ($monthsBeforeDate = $_DateTool.difference($eDate, $aDate).getMonths())
+    #set ($occurrencesBeforeDate = $_MathTool.toInteger($_MathTool.div($monthsBeforeDate, $interval)))
+    
+    #set ($numMonths = $occurrencesBeforeDate + 1)
+    #set ($numMonths = $_MathTool.mul($occurrencesBeforeDate, $interval))
+
+    ## Increment to the next month (including interval).
+    $nextOccurrence.add(2, $numMonths)
+    
+    ## "return" the next occurrence timestamp  
+    $nextOccurrence.getTimeInMillis()
+#end
