@@ -17,6 +17,8 @@ Features include:
 
 **Note:** For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
+**Note:** Calendar-Clean.csse is stripped of all example events and custom blocks such as example header, footer, and logo.
+
 ## Repeating Options
 
 ### Repeat Type
