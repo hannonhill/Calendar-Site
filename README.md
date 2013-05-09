@@ -1,6 +1,4 @@
-
-#Calendar-Examples.csse
-============================
+# Calendar-Examples.csse
 
 For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of database structure changes and updates to how Dynamic Metadata are created/stored.
 
@@ -149,17 +147,14 @@ Modify the block located at `/_cascade/blocks/calendar head files`. Update the C
 
 Note: It is recommended to publish the theme folder located at `/calendar-library/themes` before publishing the Full Calendar to ensure the styles and images are available.
 
-#Calendar-Clean.csse
-============================
+# Calendar-Clean.csse
 
 Calendar-Clean.csse has no example events and is stripped of most customizations including headers, footers, and logos.
 
-#list-events.vm
-============================
+## list-events.vm
 
 This will pull events (create a Content Type Index Block first) into another Site for showing upcoming events from the calendar.
 
-#sort-events.xml
-============================
+## sort-events.xml
 
 This XSLT is applied at either the Template or Configuration Set Level to sort those events being pulled into other Sites.
