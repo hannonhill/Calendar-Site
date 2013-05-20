@@ -1,7 +1,5 @@
 # Calendar-Examples.csse
 
-For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of database structure changes and updates to how Dynamic Metadata are created/stored.
-
 Features include:
 
 * Interactive calendar using the [Full Calendar jQuery plugin](http://arshaw.com/fullcalendar/).
