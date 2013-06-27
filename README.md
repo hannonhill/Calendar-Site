@@ -9,6 +9,7 @@ Features include:
 * Landing Page for events within a given year or month.
 * Repeatable events using daily, weekly, monthly and yearly options.
 * Multi-channel output for a variety of pages (XHTML, PDF, RSS, iCal, XML).
+* Display events from external resources (Google Calendar Feed, XML, JSON, Cascade XML and Feed Blocks)
 
 **Note:** For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
@@ -52,7 +53,7 @@ Note: If the end date is before the next occurrence, the event will not be displ
 
 #### Site URL & Page Extensions
 
-When setting up the Calendar Site, the default Site URL and Page extension values may need to be replaced. 
+When setting up the Calendar Site, the default Site URL and Page extension values may need to be replaced.
 
 The Site URL is specified in the following locations:
 
@@ -128,7 +129,6 @@ In order for the categories to be color coded, the block located at `/calendar-l
 
 Note: If any category is renamed, existing events and color mappings must be updated to reflect the new category value. The category colors should be in hex or color name format. For example, `#000`, `#a32929` or `green`.
 
-
 ## Theming the Full Calendar jQuery Plugin
 
 The Full Calendar jQuery plugin is themable using [jQuery UI ThemeRoller](http://jqueryui.com/themeroller/).
@@ -145,13 +145,106 @@ Modify the block located at `/_cascade/blocks/calendar head files`. Update the C
 
 Note: It is recommended to publish the theme folder located at `/calendar-library/themes` before publishing the Full Calendar to ensure the styles and images are available.
 
+## External Sources
+
+The Calendar can be configured to pull external sources into the full calendar, category listing, term listing, and year/month landing pages.
+
+Note: Only the HTML outputs will contain the external sources. XML, RSS and iCal are not applicable because they are static files.
+
+### Available Sources
+
+#### RSS
+
+An RSS feed can be pulled into the Calendar Site by adding a URL to the feed within the *URL* field or by creating a Feed Block and selecting it using the *Feed/XML Block* chooser.
+
+#### Google Calendar Feed
+
+Feeds from a public Google Calendar can be pulled into the Calendar Site. To locate the feed URL, open your Google Calendar, navigate to **Calendar Settings** , click on the **XML** icon and copy the address presented to you within the popup.
+
+Note: The calendar *must* be public in order for the calendar to be able to pull in the data.
+
+#### JSON
+
+A JSON file can be pulled into the Calendar Site by supplying a URL to the file. Events should be in the format:
+
+```
+{
+ "events": {
+  "event": [
+   {
+    "id": [String/Integer. Optional],
+    "title": [String. Required],
+    "start": [UNIX Timestamp. Required],
+    "end": [UNIX Timestamp. Optional],
+    "summary": [String. Optional],
+    "location": [String. Optional],
+    "allDay": [Boolean. Optional],
+    "url": [String. Optional],
+    "className": [String/Array. Optional]
+   },
+   {
+    ... Repeat for additional events ...
+   }
+  ]
+  }
+}
+```
+
+
+Note: The value(s) of the `className` attribute should correspond to the name of the categories within the Calendar Site. URLs containing `--` are removed to avoid render/publish issues with Cascade.
+
+#### XML
+
+The Calendar Site can pull in XML data by adding a URL to the XML file within the *URL* field or by creating an XML Block and selecting it using the *Feed/XML Block* chooser. Events should be in the format:
+
+```
+<events>
+  <event>
+    <title>[String/Integer. Optional]</title>
+    <title>[String. Required]</title>
+    <start>[UNIX Timestamp. Required]</start>
+    <end>[UNIX Timestamp. Optional]</end>
+    <summary>[String. Optional]</summary>
+    <location>[String. Optional]</location>
+    <allDay>[Boolean. Optional]</allDay>
+    <url>[String. Optional]</url>
+    <categories>
+        <category>[String. Optional]</category>
+        ... Repeat <category> for additional categories ...
+    </categories>
+  </event>
+  ... Repeat for additional events ...
+</events>
+```
+
+Note: The value(s) of the `<category>` element should correspond to the name of the categories within the Calendar Site. URLs containing `--` are removed to avoid render/publish issues with Cascade.
+
+### Adding/Updating External Sources
+
+To add/update external sources edit the Structured Data Block located at `/calendar-library/external-sources/external sources`. See above for the various options.
+
+Note: After updating the Block, the associated Pages should be republished.
+
+### Configuring Pages to Include External Sources
+
+Due to current limitations, the full calendar, category listing and term listing Pages have a block chooser to select the desired External Sources Structured Data Block. Year/Month landing Pages automatically include the block within the **External Source Script** Region (within the HTML Output). Update the chooser/region to point to the desired external sources Block and republish the Page(s). Alternatively, you can simply "empty" the external sources Block so it does not load anything.
+
+### Additional Information
+
+The external sources feature leverages [Yahoo Query Language](http://developer.yahoo.com/yql/) for consuming external sources that have a URL provided. This is to avoid the Cross Domain Policy restriction of AJAX requests. A custom plugin, `/_files/scripts/jquery.yqlhelper-0.1` is used to interface with YQL.
+
+**Current Limitations**
+
+- Current YQL restrictions require that the URLs contain a standard HTTP/HTTPS port (80/443); however, this may change in the future.
+- YQL queries are cached for 15 minutes to avoid rate limit issues. To change this timeframe, pass `maxAge` (in seconds) within the options for `$.YQL.query()`.
+
 # Calendar-Clean.csse
 
 Calendar-Clean.csse has no example events and is stripped of most customizations including headers, footers, and logos.
 
 ## list-events.vm
 
-This will pull events (create a Content Type Index Block first) into another Site for showing upcoming events from the calendar.
+This will pull events (create a Content Type Index Block first) into another Site for showing upcoming events from the calendar. Note: External sources are not applicable.
 
 ## sort-events.xml
 
