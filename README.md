@@ -11,7 +11,7 @@ Features include:
 * Multi-channel output for a variety of pages (XHTML, PDF, RSS, iCal, XML).
 * Display events from external resources (Google Calendar Feed, XML, JSON, Cascade XML and Feed Blocks)
 
-**Note:** For best results, import into an instance of Cascade running version 7.2 or greater. Results may vary importing into 7.0.x because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
+**Note:** This version makes use of the Velocity `#import` directive. For best results, import into an instance of Cascade running version 7.6 or greater; otherwise, the Formats being imported will need to be copied into the Format performing the import. Results may vary importing into 7.0.x, because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
 ## Repeating Options
 
