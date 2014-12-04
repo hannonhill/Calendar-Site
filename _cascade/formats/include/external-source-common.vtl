@@ -1,0 +1,587 @@
+## Import common string helpers
+#import("/_cascade/formats/include/helpers")
+#if ( !$sources )
+#set ( $sources = $_XPathTool.selectNodes($contentRoot, "//source") )
+#end
+#set ( $gcAPIKey = $_XPathTool.selectSingleNode($contentRoot, "//system-data-structure/gc-api-key").value )
+#set ( $listingDateFormat = "ddd, MMM D, YYYY" )
+#set ( $monthDateFormat = "MMM" )
+#set ( $domDateFormat = "D" )
+#set ( $dayNameDateFormat = "dddd" )
+#set ( $hourMinAPDateFormat = "h:mm a" )
+#set ( $listingJquerySelector = "[data-type='events']" )
+#set ( $listingLimitAttribute = "data-limit" )
+#set ( $listingCategoriesAttribute = "data-categories" )
+#set ( $listingTimestampAttribute = "data-timestamp" )
+#set ( $listingEndTimestampAttribute = "data-end" )
+#set ( $listingStartTimestampAttribute = "data-start" )
+#set ( $preloaderContent = "<div class='alert alert-info text-center'><em class='fa fa-refresh fa-spin'>&#160;</em> Loading...</div>" )
+#set ( $timeoutContent = "<div class='alert alert-warning text-center'><em class='fa fa-refresh fa-spin'>&#160;</em> Still loading...</div>" )
+
+#set ($date = $_DateTool.getDate())  
+#if (!$categoriesLimits)
+#set ( $categoriesLimits = "{'default':-1}" )
+#end
+#if (!$className)
+#set( $className = "" )
+#end
+
+#set ( $sourceURLs = $_XPathTool.selectNodes($sources, ".[url != '' and url != 'http://']") )
+
+## Grab the current time.
+#set ($currTime = $_XPathTool.selectSingleNode($contentRoot, "/system-index-block/@current-time").value)
+
+## Check to see if there are any XML, RSS or JSON sources, if so load the additional Full Calendar add-on
+#if ($sourceURLs.size() > 0)
+<script src="/_files/js/vendor/moment.min.js" type="text/javascript"></script>
+<script src="/_files/js/plugins/jquery.yqlhelper.min.js" type="text/javascript"></script>
+#end
+
+#if ($sources.size() > 0)
+<!--#protect
+<script type="text/javascript">
+    $(document).ready(function() {
+        var eventsList = $("${listingJquerySelector}"),
+            preloadTimeout,
+            parentContainer = eventsList.parent(),
+            listStartTimestamp = eventsList.attr("${listingStartTimestampAttribute}"),
+            listEndTimestamp = eventsList.attr("${listingEndTimestampAttribute}"),
+            listLimit = parseInt(eventsList.attr("${listingLimitAttribute}")),
+            $deferredEvents = [],
+            googleCalendar = function(data,textStatus,jqXHR,srcCategory) {
+                #jsonGoogleCalendarJs()
+            },
+            generateEventItem = function(opts) {
+                // Ensure we have a title and start date before continuing.
+                if (opts.start === undefined || opts.title === undefined) return false;
+
+                // Initialize some of the event information.
+                var id = opts.id || "",
+                    start = opts.start,
+                    end = opts.end || 0,
+                    categories = opts.categories || "uncategorized",
+                    title = opts.title,
+                    summary = opts.summary || "",
+                    url = opts.url || "",
+                    className = opts.className || "",
+                    m = null;
+
+                // If the timestamp is not a number, attempt to parse a Date string.
+                if (isNaN(start)) {
+                    start = Date.parse(opts.start);
+                }
+
+                // If the timestamp is still not a number, we have an invalid date, return.
+                if (isNaN(start) || start < listStartTimestamp || start > listEndTimestamp) return false;
+
+                m = moment(start);
+                e = moment(end);
+                catClasses = categories.toLowerCase()
+                    .replace(/\s+/g,'-')
+                    .replace(/[^,\w-]/g, '')
+                    .split(',')
+                    .join(' ');
+                var startTime = m.format("h:mm a"),
+                    endTime = "";
+                if (end) endTime = e.format("h:mm a");
+                // Return the new list item to be appended.
+                var itemLI = $('<li/>', {
+                    "${listingTimestampAttribute}": start,
+                    "${listingCategoriesAttribute}": categories,
+                    "data-guid": id,
+                    html: '<div class="month-dom-box">'
+                    +'<span class="month">' + m.format("MMM") + '</span>'
+                    +'<span class="dom">' + m.format("D") + '</span>'
+                    +'</div>'
+                    +(url ? '<a class="title" href="'+url+'" target="_parent">' + title + '</a>'
+                        : '<span class="title">' + title + '</span>')
+                    +'<div class="time text-muted">'
+                    +'<span class="day">'+m.format("dddd")+'</span>'
+                      +(startTime == '12:00 am' ? '' :
+                        '<span class="start-time">'+startTime+'</span>'
+                        +(!end || startTime == endTime ? '' :
+                            ' - <span class="end-time">'+endTime+'</span>') )
+                    +'</div>'
+                    +'<div class="summary">'+summary+'</div>'
+                    ,'class': className + ' ' + catClasses
+                });
+                //console.log("Generated event item: ");
+                //console.log(itemLI);
+                return itemLI;
+            };
+        console.log('Events Limit: '+listLimit);
+        // Bind a sorting event to the list.
+        eventsList.on("sort", function() {
+            var events = eventsList.children();
+
+            // Clear the contents of the list.
+            eventsList.html("");
+
+            // Remove the list from it's parent container and sort it.
+            events.sort(function(a, b) {
+                // convert to integers from strings
+                a = $(a).attr("${listingTimestampAttribute}");
+                b = $(b).attr("${listingTimestampAttribute}");
+
+                // compare
+                if (a > b) {
+                    return 1;
+                } else if (a < b) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            });
+            var categoryCount = {};
+            var categoriesLimits = ${categoriesLimits};
+            var finalEvents = [];
+            //console.log("Collecting events...");
+            events.each(function (index) {
+                var event = $(this);
+                var categories = event.attr("${listingCategoriesAttribute}");
+                var cats = categories.split(',');
+                var addToList = true;
+                for (var ci = 0; ci < cats.length; ci++) {
+                    var curCat = cats[ci],
+                    catCount = categoryCount[curCat];
+                    if (!catCount) catCount = 0;
+                    var catMax =  categoriesLimits['default'];
+                    if (curCat in categoriesLimits) catMax = categoriesLimits[curCat];
+                    var listLimitOK = listLimit < 0 || finalEvents.length < listLimit,
+                        catMaxOK = (catMax < 0 || catCount < catMax);
+
+                    //console.log(event.find('a').text()+' ('+curCat+'), addToList: '+addToList+', listLimitOK: '+listLimitOK+', catMaxOK: '+catMaxOK);
+                    // only push to final list if under total limit and limit per category....
+                    addToList = addToList && listLimitOK && catMaxOK;
+                }
+                if (addToList) {
+                    // increase category counts for all categories when adding an item.
+                    for (var ci = 0; ci < cats.length; ci++) {
+                        var curCat = cats[ci];
+                        var catCount = categoryCount[curCat];
+                        if (!catCount) catCount = 0;
+                        categoryCount[curCat] = catCount+1;
+                    }
+                    finalEvents.push(this);
+                    //console.log("Added event: "+event.find('a').text()+", categories ("+categories+").");
+                } else {
+                    //console.log("Excluded event: " + event.find('a').text() +', categories: ('+categories+')');
+                }
+            });
+            // Add the newly sorted content back to the list and its parent container.
+            eventsList.html(finalEvents);
+
+            // If we're over the limit, hide the rest.
+            //if (events.length > listLimit) {
+            //    eventsList.children(":gt("+(listLimit-1)+")").hide();
+            //}
+
+            // Add the list back to its parent container.
+            parentContainer.html(eventsList);
+        });
+
+        // Remove the list and display a preloader.
+        eventsList.detach();
+        parentContainer.prepend("${preloaderContent}");
+    #foreach ($s in $sources)
+        #set ( $type = $s.getChild("type").value )
+        #set ( $url = $s.getChild("url").value )
+        #set ( $block = $s.getChild("block") )
+
+        #set ( $sourceCategory = $s.getChild("category").value )
+        #if ($type == "Google Calendar")
+            #set ( $calID = $s.getChild("gc-cid").value )
+            #set ( $calKey = "" )
+            #set ( $calKey = $s.getChild("gc-api-key").value )
+            #if ( $calKey == "" )
+                #set( $calKey = $gcAPIKey )
+            #end
+            #set ( $url = "https://www.googleapis.com/calendar/v3/calendars/${calID}/events?key=$calKey&singleEvents=true" )
+            var url = "${url}",
+                mST = moment(parseInt(listStartTimestamp)),
+                mET = moment(parseInt(listEndTimestamp));
+            if (listStartTimestamp) url += "&timeMin=" + mST.toISOString();
+            if (listEndTimestamp) url += "&timeMax=" + mET.toISOString();
+            if (listLimit > 0) url += "&maxResults="+listLimit;
+            //console.log("timeMin: "+mST.toISOString() + " timeMax: "+mET.toISOString());
+            ${_EscapeTool.d}deferredEvents.push($.getJSON(url,"",
+            function(data,textStatus,jqXHR) {
+                googleCalendar(data,textStatus,jqXHR,"${sourceCategory}");
+            },
+            function(d) {
+                console.log('Google Calendar fail...');
+                console.log(d);
+            }));
+        #elseif ($type == "JSON")
+            #if ($url != "")
+            ${_EscapeTool.d}deferredEvents.push($.YQL.query("select * from json where url='${url}'").then(function(data){
+                #yqlJsonXmlJs(${sourceCategory})
+            }));
+            #end  
+        #elseif ($type == "RSS")
+            #if ($url != "")
+            ${_EscapeTool.d}deferredEvents.push($.YQL.query("select * from rss where url='${url}'").then(function(data){
+                #yqlRssJs(${sourceCategory})
+            }));
+            #elseif ($block.getChild("path").value != "/")
+                #set ( $items = $_XPathTool.selectNodes($block, "//item") )
+                #if ($items.size() > 0)
+                ${_EscapeTool.d}.each([#foreach($i in $items)#rssItemToJS($i)#if($foreach.hasNext()),#end#end], function() {
+                    var event = null,
+                        eventStart = parseInt(this.start),
+                        eventEnd = parseInt(this.end),
+                        category = "";
+                    if (this.category) category = ','+this.category;
+
+                    event = generateEventItem({
+                        start: eventStart,
+                        end: eventEnd,
+                        categories: "${sourceCategory}"+category,
+                        className: "${className}",
+                        title: this.title || "",
+                        summary: this.description || "",
+                        url: this.url || ""
+                    });
+                    eventsList.append(event);
+                });
+                #end
+            #end  
+        #elseif ($type == "XML")
+            #if ($url != "")
+            ${_EscapeTool.d}deferredEvents.push($.YQL.query("select * from xml where url='${url}'").then(function(data){
+                #yqlJsonXmlJs(${sourceCategory})
+            }));
+            #elseif ($block.getChild("path").value != "/")
+                #set ( $events = $_XPathTool.selectNodes($block, "//event[start >= ${currTime}]") )
+                #if ($events.size() > 0)
+                ${_EscapeTool.d}.each([#foreach($e in $events)#eventElementToJS($e)#if($foreach.hasNext()),#end#end], function() {
+                    var event = null,
+                        eventStart = parseInt(this.start),
+                        eventEnd = parseInt(this.end);
+                    event = generateEventItem({
+                        start: eventStart,
+                        end: eventEnd,
+                        categories: "${sourceCategory}",
+                        className: "${className}",
+                        title: this.title || "",
+                        summary: this.description || "",
+                        url: this.url || ""
+                    });
+                    eventsList.append(event);
+                });
+                #end
+            #end
+        #end
+    #end
+    #if ($sourceURLs.size() > 0)
+        // When all of the external sources are loaded, sort the listing.
+        ${_EscapeTool.d}.when.apply(null, $deferredEvents).done(function(){
+            eventsList.trigger("sort");
+            clearTimeout(preloadTimeout);
+            var summary = $('.events .summary');
+        }).fail(function(){
+            eventsList.trigger("sort");
+            clearTimeout(preloadTimeout);
+        });
+        preloadTimeout = setTimeout(function() {
+            console.log("Timeout expired waiting for external sources... ");
+            eventsList.trigger("sort");
+            parentContainer.prepend("${timeoutContent}");
+            },5*1000);
+    #else
+        eventsList.trigger("sort");
+    #end
+    });
+</script>#protect-->
+#end
+
+#*
+    Outputs the JavaScript object representation of an event XML element in the form of:
+
+    <event>
+        <id></id>
+        <title></title>
+        <start></start>
+        <end></end>
+        <categories></categories>
+        <description></description>
+        <url></url>
+    </event>
+
+    Note: Start should be a 13 digit unix timestamp.
+
+    @param  $event XML event element
+*#
+#macro ( eventElementToJS $event )
+    #set ( $title = $event.getChild("title").value )
+    #set ( $title = '#cleanString($title)' )
+    #set ( $title = $_EscapeTool.javascript($title.trim()) )
+    #set ( $description = $event.getChild("description").value )
+    #set ( $description = '#cleanString($description)' )
+    #set ( $description = $_EscapeTool.javascript($description.trim()) )
+    #set ( $start = $event.getChild("start").value )
+    #set ( $end = $event.getChild("end").value )
+    #set ( $categories = $event.getChild("categories") )
+        
+    #if ($title != "" && $start != "")
+        #set ( $end = "null" )
+        #set ( $id = $title.hashCode() )
+        #set ( $url = "" )
+        
+        #if ($event.getChild("id").value != "")
+            #set ( $id = $_EscapeTool.javascript($event.getChild("id").value) )
+        #end
+        
+        #if ($event.getChild("url").value != "" && $event.getChild("url").value.indexOf("--") == -1)
+            #set ( $url = $event.getChild("url").value )
+            #set ( $url = '#cleanString($url)' )
+            #set ( $url = $url.trim() )
+        #end   
+        
+        {
+            title: '${title}',
+            start: ${start},
+            end: ${end},
+            categories: "${_DisplayTool.list($categories,',',',','value')}",
+            description: '${description}',
+            id: '${id}',
+            url: '${url}'
+        }
+    #end
+#end
+
+#*
+    Outputs the JavaScript object representation of an RSS item in the form of:
+
+    <item>
+        <title></title>
+        <pubDate></pubDate>
+        <link></link>
+        <guid></guid>
+        <description></description>
+    </item>
+
+    @param  $item RSS item
+*#
+#macro ( rssItemToJS $item $categories )
+    #set ( $title = $item.getChild("title").value )
+    #set ( $title = '#cleanString($title)' )
+    #set ( $title = $_EscapeTool.javascript($title.trim()) )
+    #set ( $start = $item.getChild("pubDate").value )
+        
+    #if ($title != "" && $start != "")   
+        #set ( $id = $title.hashCode() )
+        #set ( $url = "" )
+        
+        #if ($item.getChild("guid").value != "")
+            #set ( $id = $_EscapeTool.javascript($event.getChild("guid").value) )
+        #end
+
+        #if ($item.getChild("link").value != "" && $item.getChild("link").value.indexOf("--") == -1)
+            #set ( $url = $item.getChild("link").value )
+            #set ( $url = '#cleanString($url)' )
+            #set ( $url = $url.trim() )
+        #end
+        
+        {
+            title: '${title}',
+            start: Date.parse("${start}"),
+            end: 0,
+            categories: '${categories}',
+            id: '${id}',
+            url: '${url}',
+            description: '${description}'
+        }
+    #end
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an Atom feed has completed.
+*#
+#macro ( yqlAtomJs $categories )
+    try {
+        if (data.query.count > 0) {
+            if (data.query.results.feed.entry.length === undefined) {
+                data.query.results.feed.entry = [data.query.results.feed.entry];
+            }
+            $.each(data.query.results.feed.entry, function () {
+            /* FIX: Found recurrence does not have the "when" property */
+                if (! this.when) { 
+                    if (! this.recurrence) {
+                        return;
+                    } else {
+                        this.when = {};
+                        var recST = /DTSTART;TZID=[^:]+:([0-9T]+)DTEND;TZID=[^:]+:([0-9T]+)/.exec(this.recurrence);
+                        if (!recST || !recST[1]) { return; }
+                        this.when.startTime = recST[1];
+                        this.when.endTime = recST[2];
+                    }
+                }
+                var url = null,
+                event = null,
+                eventStart = moment(this.when.startTime).valueOf(),
+                eventEnd = moment(this.when.endTime).valueOf(),
+                category = "";
+    
+                /* Find the correct link (there may be multiple). */
+                if (this.link && this.link.length === undefined) {
+                    this.link = [this.link];
+                }
+                $.each(this.link, function() {
+                    if (this.rel.match(/alternate|self/) && this.type.match(/text\/html/)) {
+                        url = this.href;
+                    }
+                });
+                if (this.category) {
+                    if (this.category['scheme'] == 'http://schemas.google.com/g/2005#kind') {
+                        category = ','+this.who['valueString'];
+                    } else {
+                        category = ','+this.category;
+                    }
+                }
+                event = generateEventItem({
+                    start: eventStart,
+                    end: eventEnd,
+                    categories: "${categories}"+category,
+                    className: "${className}",
+                    title: this.title.content || this.title || "",
+                    summary: this.description || this.content.content || "",
+                    url: url
+                });
+    
+                eventsList.append(event);
+            });
+        }
+    } catch (e) {
+        console.log(e);
+    }        
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an Atom feed has completed.
+*#
+#macro ( jsonGoogleCalendarJs )
+    try {
+        if (data.items.length > 0) {
+            $.each(data.items, function () {
+            /* FIX: Ask for single events in the query to not have to deal with 
+               recurrence here at all */
+                var url = this.htmlLink,
+                event = null,
+                eventStart =  moment(this.start.dateTime || this.start.date).valueOf(),
+                eventEnd = moment(this.end.dateTime || this.end.date).valueOf(),
+                category = "";
+    
+                if (data.summary) {
+                    category = ','+data.summary;
+                }
+                event = generateEventItem({
+                    start: eventStart,
+                    end: eventEnd,
+                    categories: srcCategory+category,
+                    className: "${className}",
+                    title: this.summary || "",
+                    summary: this.description || "",
+                    url: url
+                });
+    
+                eventsList.append(event);
+                //console.log('Added Google event ('+event+'): '+this.summary+' on: ' + moment(eventStart).format("YYYY-MM-DD") );
+                //console.log(event);
+            });
+        }
+    } catch (e) {
+        console.log(e);
+    }        
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an external XML or JSON events file has completed.
+
+    Events should be in the following format:
+
+    XML:
+    <event>
+        <id></id>
+        <title></title>
+        <start></start>
+        <description></description>
+        <url></url>
+    </event>
+
+    JSON:
+    {
+        id: "ID",
+        title: "TITLE",
+        start: UNIX_TIMESTAMP,
+        url: "URL"
+    }
+
+    Note: Start should be a 13 digit unix timestamp.
+*#
+#macro ( yqlJsonXmlJs $categories)
+    try {
+        if (data.query.count > 0) {
+            if (data.query.results.events.event.length === undefined) {
+                data.query.results.events.event = [data.query.results.events.event];
+            }
+            $.each(data.query.results.events.event, function () {
+                var event = null,
+                    categories = "${categories}",
+                    eventStart = parseInt(this.start),
+                    eventEnd = parseInt(this.end),
+                    category = "";
+                if (this.category) category = ','+this.category;
+                //console.log(this.category);
+                var event = generateEventItem({
+                    start: eventStart,
+                    end: eventEnd,
+                    categories: "${categories}"+category,
+                    className: "${className}",
+                    title: this.title || "",
+                    summary: this.description || "",
+                    url: this.url || ""
+                });
+                eventsList.append(event);
+            });
+        }
+    } catch (e) {
+        console.log(e);
+    }        
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an RSS feed has completed.
+*#
+#macro ( yqlRssJs $categories )
+    try {
+        if (data.query.count > 0) {
+            if (data.query.results.item.length === undefined) {
+                data.query.results.item = [data.query.results.item];
+            }
+            $.each(data.query.results.item, function () {
+                var event = null,
+                    categories = "${categories}",
+                    eventStart = Date.parse(this.pubDate)  ,
+                    category = "";
+                if (this.category) category = ','+this.category;
+                event = generateEventItem({
+                    start: eventStart,
+                    categories: "${categories}"+category,
+                    className: "${className}",
+                    title: this.title || "",
+                    summary: this.description || this.guid.content || this.title.hashCode(),
+                    url: this.link || ""
+                });
+    
+                eventsList.append(event);
+            });
+        }
+    } catch (e) {
+        console.log(e);
+    }
+#end

@@ -1,0 +1,23 @@
+<system-data-structure>
+    <text identifier="gc-api-key" label="Google API Key"/>
+    <group identifier="source" label="External Source" multiple="true">
+        <text type="dropdown" identifier="type" label="Type" default="RSS" required="true">
+            <dropdown-item value="RSS"/>
+            <dropdown-item value="Google Calendar"/>
+            <dropdown-item value="JSON"/>
+            <dropdown-item value="XML"/>
+        </text>
+        <text identifier="url" label="URL"/>
+        <text identifier="gc-cid" label="Google Calendar ID"/>
+        <text identifier="gc-api-key" label="Google API Key"/>
+        <asset type="block" identifier="block" label="Feed/XML Block" render-content-depth="5"/>
+        <text type="dropdown" identifier="category" label="Category" default="Campus Events">
+            <dropdown-item value="Campus Events"/>
+            <dropdown-item value="Academics"/>
+            <dropdown-item value="Alumni"/>
+            <dropdown-item value="Athletics"/>
+            <dropdown-item value="Holidays"/>
+            <dropdown-item value="Students"/>
+        </text>
+    </group>
+</system-data-structure>
