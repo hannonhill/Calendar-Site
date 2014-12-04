@@ -16,6 +16,7 @@ Features include:
 ## Google Calendar API v3 Update
 
 I fell in love with using externally sourced calendars but then all my Google Calendar sources died on November 17, 2014 when Google dropped the v2 of the API (which lots of things used - FullCalendar and more!).
+
 Included in the Calendar API v3 Update: [FullCalendar v2.2.3](_files/js/vendor/fullcalendar.min.js) and [Moment v2.8.4](_files/js/vendor/moment.min.js)
 [Calendar-Examples_v7.12.csse](Calendar-Examples_v7.12.csse) includes the code updates you'll find under [_cascade](_cascade) and [_files](_files), respectively.
 
