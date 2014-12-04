@@ -13,6 +13,12 @@ Features include:
 
 **Note:** This version makes use of the Velocity `#import` directive. For best results, import into an instance of Cascade running version 7.6 or greater; otherwise, the Formats being imported will need to be copied into the Format performing the import. Results may vary importing into 7.0.x, because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
+## Google Calendar API v3 Update
+
+I fell in love with using externally sourced calendars but then all my Google Calendar sources died on November 17, 2014 when Google dropped the v2 of the API (which lots of things used - FullCalendar and more!).
+Included in the Calendar API v3 Update: [FullCalendar v2.2.3](_files/js/vendor/fullcalendar.min.js) and [Moment v2.8.4](_files/js/vendor/moment.min.js)
+[Calendar-Examples_v7.12.csse](Calendar-Examples_v7.12.csse) includes the code updates you'll find under [_cascade](_cascade) and [_files](_files), respectively.
+
 ## Documentation
 
 - [Repeating event options](docs/repeat-options.md)
