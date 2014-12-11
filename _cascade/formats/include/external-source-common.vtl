@@ -196,7 +196,7 @@
             #if ( $calKey == "" )
                 #set( $calKey = $gcAPIKey )
             #end
-            #set ( $url = "https://www.googleapis.com/calendar/v3/calendars/${calID}/events?key=$calKey&singleEvents=true" )
+            #set ( $url = "https://www.googleapis.com/calendar/v3/calendars/${calID}/events?key=$calKey&singleEvents=true&orderBy=startTime" )
             var url = "${url}",
                 mST = moment(parseInt(listStartTimestamp)),
                 mET = moment(parseInt(listEndTimestamp));
