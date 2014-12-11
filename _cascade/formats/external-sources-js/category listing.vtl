@@ -1,0 +1,24 @@
+#set ($categoriesXpath = "")
+#set ($categories = $_XPathTool.selectNodes($contentRoot, "/system-index-block/calling-page/system-page/dynamic-metadata[name='categories']/value"))
+#if ($categories.size() > 0)
+    #foreach ($category in $categories)
+        #if ($foreach.index == 0)
+            #set ($categoriesXpath = "category = '${category.value}'")
+        #else
+            #set ($categoriesXpath = "${categoriesXpath} or category = '${category.value}'")
+        #end    
+    #end
+#end
+#set ( $sources = $_XPathTool.selectNodes($contentRoot, "//source[${categoriesXpath}]") )
+#set ( $className = "col-xs-6" )
+#*
+$categoriesLimits = {'category':n } (JSON dictionary) is a way to filter 
+externally sourced calendars based on their category.
+Events can be in multiple categories but will be excluded as soon as 
+any of their category limits have been exceeded.
+-1 = unlimited
+ 0 = none
+*#
+##set ( $categoriesLimits = "{'default':-1, 'Athletics':25 }" )
+
+#import("/_cascade/formats/include/external-source-common")

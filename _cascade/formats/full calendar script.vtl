@@ -1,0 +1,403 @@
+## Import common string helpers
+#import ("/_cascade/formats/include/helpers")
+
+#set ($folderPrefix = '/' ) ## The base path for the events archive (up until yyyy/mm).
+#set ($landingPageName = 'index' ) ## The name of events landing XML pages.
+
+#set ($callingPage = $_XPathTool.selectSingleNode($contentRoot, "/system-index-block/calling-page/system-page"))
+#set ($calendarCategories = $_XPathTool.selectNodes($callingPage, "dynamic-metadata[name='categories']/value"))
+#set ($pageData = $callingPage.getChild("system-data-structure"))
+#set ($colorMapping = $_XPathTool.selectSingleNode($pageData, "colorMapping/content/system-data-structure"))
+#set ($addPopovers = $pageData.getChild("popovers"))
+
+#set ($categoriesMap = []) ## Create a hash of the selected categories and associated information.
+#foreach ($calCat in $calendarCategories)
+    #set ($category = $_XPathTool.selectSingleNode($colorMapping, "category[category='${calCat.value}']"))
+    #set ($index = $colorMapping.indexOf($category))
+    #if ( $index != -1)
+        #set ($classname = $category.getChild("classname").value.replaceAll(" ", "_"))
+        #if ($classname == "") ## If there was no classname supplied, use the category name
+            #set ($classname = $calCat.value.replaceAll(" ", "_"))
+        #end
+        #set ($csscolor = $category.getChild("csscolor").value)
+        #if ($categoriesMap.size() < $index)
+            #set ($_void = $categoriesMap.add({"name":"${calCat.value}", "classname":"${classname}", "csscolor":"${csscolor}"}))
+        #else
+            #set ($_void = $categoriesMap.add($index, {"name":"${calCat.value}", "classname":"${classname}", "csscolor":"${csscolor}"}))
+        #end
+    #end
+#end
+
+#set ( $categoriesJSObj = "#generateCategories" )
+#set ( $recurringPathArray = "#generateRecurringPathArray" )
+#set ( $yyyyMMPathMap =  "#generateYYYYMMPathMap" )
+#set ( $externalSources = $_XPathTool.selectNodes($contentRoot, "//source") )
+#set ( $gcapikey = $_XPathTool.selectSingleNode($contentRoot, "//system-data-structure/gc-api-key").value )
+
+## Output the script for the full calendar.
+<script src="/_files/js/vendor/LAB.min.js"></script>
+<script type="text/javascript"><![CDATA[#protect
+    $LAB
+        .script("[system-asset:id=f5240bea0a5001b4733e6a712a3ff220]/_files/js/vendor/jquery-1.8.1.min.js[/system-asset]").wait()
+        .script("[system-asset:id=f5240c440a5001b4733e6a71b8b3bc7c]/_files/js/vendor/jquery-ui-1.8.23.custom.min.js[/system-asset]")
+        .script("[system-asset:id=f524088b0a5001b4733e6a7109b6dd7c]/_files/js/vendor/bootstrap.min.js[/system-asset]")
+        .script("[system-asset:id=f5240ce60a5001b4733e6a7105bbdc70]/_files/js/vendor/moment.min.js[/system-asset]")
+        .script("[system-asset:id=f52406ee0a5001b4733e6a71555a56a8]/_files/js/plugins/jquery.yqlhelper.min.js[/system-asset]")
+        .script("[system-asset:id=f5240b1e0a5001b4733e6a718ac8b852]/_files/js/vendor/fullcalendar.min.js[/system-asset]").wait()
+        .script("[system-asset:id=f5240ba20a5001b4733e6a711f0c6aa0]/_files/js/vendor/gcal.js[/system-asset]").wait()
+        .script("[system-asset:id=f52405bb0a5001b4733e6a7199445a46]/_files/js/plugins/jquery.hhcalendar.js[/system-asset]").wait(function(){
+            var calendar = $("#calendar").hhCalendar({
+                    googleCalendarApiKey: "${gcapikey}",
+                    categories: {${categoriesJSObj.replaceAll($trimSpacingRegExp, "")}},
+                    recurringPathArray: [${recurringPathArray.replaceAll($trimSpacingRegExp, "")}],
+                    yyyyMMPathMap: {${yyyyMMPathMap.replaceAll($trimSpacingRegExp, "")}}
+                }).data("hh-calendar"),
+                timestampToUnix = function(timestamp) {
+                    var tString = timestamp.toString();
+                    return tString.length > 10 ? Math.floor(timestamp/1000) : timestamp;
+                };
+
+            calendar.renderCategoryOptions($("#calendars"));
+
+            #if ($externalSources.size() > 0)                
+                #foreach ($s in $externalSources)
+                    #set ( $type = $s.getChild("type").value )
+                    #set ( $url = $s.getChild("url").value )
+                    #set ( $block = $s.getChild("block") )
+                    #set ( $sourceCategory = $s.getChild("category").value )
+                    #if ($type == "Google Calendar")
+                        #set ( $gcak = "" )
+                        #set ( $gcid = $s.getChild("gc-cid").value )
+                        #set ( $gcak = $s.getChild("gc-api-key").value )
+                        calendar.FC.fullCalendar("addEventSource", {
+                            #if ($gcak != '')
+                            googleCalendarApiKey: "${gcak}", #end
+                            googleCalendarId: "${gcid}",
+                            className: calendar._getCategoryCSSClass("${sourceCategory}")
+                        });
+                    #elseif ($type == "JSON")
+                        #if ($url != "")
+                        $.YQL.query("select * from json where url='${url}'").then(function (data) {
+                            #set($js = "#yqlJsonXmlJs()")${js.replaceAll($trimSpacingRegExp, "")}
+                        });
+                        #end  
+                    #elseif ($type == "RSS")
+                        #if ($url != "")
+                        $.YQL.query("select * from rss where url='${url}'").then(function (data) {
+                            #set($js = "#yqlRssJs()")${js.replaceAll($trimSpacingRegExp, "")}
+                        });
+                        #elseif ($block.getChild("path").value != "/")
+                            #set ( $items = $_XPathTool.selectNodes($block, "//item") )
+                            #if ($items.size() > 0)
+                            calendar.FC.fullCalendar("addEventSource", {
+                                events: function(start, end, timezone, callback) {
+                                    var events = [#foreach($i in $items)#set($jsObj = "#rssItemToJS($i)")${jsObj.replaceAll($trimSpacingRegExp, "")}#if($foreach.hasNext()),#end#end];
+                                    callback(events);
+                                },
+                                className: calendar._getCategoryCSSClass("${sourceCategory}")
+                            });
+                            #end
+                        #end  
+                    #elseif ($type == "XML")
+                        #if ($url != "")
+                        $.YQL.query("select * from xml where url='${url}'").then(function (data) {
+                            #set($js = "#yqlJsonXmlJs()")${js.replaceAll($trimSpacingRegExp, "")}
+                        });
+                        #elseif ($block.getChild("path").value != "/")
+                            #set ( $events = $_XPathTool.selectNodes($block, "//event") )
+                            #if ($events.size() > 0)
+                            calendar.FC.fullCalendar("addEventSource", {
+                                events: function(start, end, timezone, callback) {
+                                    var events = [#foreach($e in $events)#set($jsObj = "#eventElementToJS($e)")${jsObj.replaceAll($trimSpacingRegExp, "")}#if($foreach.hasNext()),#end#end];
+                                    callback(events);
+                                },
+                                className: calendar._getCategoryCSSClass("${sourceCategory}")
+                            });
+                            #end
+                        #end
+                    #end
+                #end
+            #end
+        });
+#protect]]></script>
+
+## JavaScript object of the selected categories to display and their associated CSS class.
+#macro (generateCategories)
+    #set ($countCat = 1)
+    #foreach ($cat in $categoriesMap)
+        #set ($classname = $cat.get("classname"))
+        ${cat.get("name").replaceAll(" ", "_")}: "${classname}"
+        #if($countCat < $calendarCategories.size()),#end
+        #set ($countCat = $countCat + 1)
+    #end
+#end
+
+## JavaScript array of recurring event XML files. Path must match /YYYY/$landingPageName.
+#macro (generateRecurringPathArray)
+    #set ($first = true)
+    #set ($archives = $_XPathTool.selectNodes($contentRoot,"//system-page[not(contains(path, '_cascade')) and not(@current)]"))
+    #foreach($archive in $archives)
+        #set ($path = $archive.getChild("path").value)
+        #if ($path.matches("${folderPrefix}[0-9]{4}\/${landingPageName}"))
+            #if ($first == true )#set($first = false)#else,#end
+            #set ($id = $archive.getAttribute("id").value)
+            "[system-view:external][system-asset]${path}[/system-asset][/system-view:external][system-view:internal]/render/page.act?type=page&amp;id=${id}&amp;demarcate=false[/system-view:internal]"
+        #end
+    #end
+#end
+
+## JavaScript object of non-recurring event XML files and their associated year/month. Path must match /YYYY/MM/$landingPageName.
+#macro (generateYYYYMMPathMap)
+    #set ($first = true)
+    #set ($archives = $_XPathTool.selectNodes($contentRoot,"//system-page[not(contains(path, '_cascade')) and not(@current)]"))
+    #foreach($archive in $archives)
+        #set ($path = $archive.getChild("path").value)
+        #if ($path.matches("${folderPrefix}[0-9]{4}\/[0-9]{2}\/${landingPageName}"))
+            #if ($first == true )#set($first = false)#else,#end
+            #set ($id = $archive.getAttribute("id").value)
+            #set ($fixedPath = $_StringTool.substringAfter($path, $folderPrefix))
+            #set ($fixedPath = $_StringTool.substringBefore($fixedPath, $landingPageName))
+            #set ($fixedPath = $fixedPath.replace("/", "") )
+            $fixedPath: "[system-view:external][system-asset]${path}[/system-asset][/system-view:external][system-view:internal]/render/page.act?type=page&amp;id=${id}&amp;demarcate=false[/system-view:internal]"
+        #end
+    #end
+#end
+
+#*
+    Outputs the JavaScript object representation of an event XML element in the form of:
+
+    <event>
+        <id></id>
+        <title></title>
+        <start></start>
+        <url></url>
+    </event>
+
+    Note: Start should be a 13 digit unix timestamp.
+
+    @param  $event XML event element
+*#
+#macro ( eventElementToJS $event )
+    #set ( $title = $event.getChild("title").value )
+    #set ( $title = "#cleanString($title)" )
+    #set ( $title = $_EscapeTool.javascript($title.trim()) )
+    #set ( $start = $event.getChild("start").value )
+    #set ( $start = "#timestampToUnix($start)" )
+    #set ( $start = $_MathTool.toInteger($start.trim()) )
+    #set ( $categories = $_XPathTool.selectNodes($event, ".//category") )
+        
+    #if ($title != "" && $start != "")
+        #set ( $end = "null" )
+        #set ( $id = $title.hashCode() )
+        #set ( $summary = "" )
+        #set ( $location = "" )
+        #set ( $url = "" )
+        #set ( $allDay = true )
+        #set ( $className = "[]" )
+        
+        #if ($event.getChild("end").value != "")
+            #set ( $end = $event.getChild("end").value )
+            #set ( $end = "#timestampToUnix($end)" )
+            #set ( $end = $_MathTool.toInteger($end.trim()) )
+        #else
+            #set ( $end = $start )
+        #end
+        
+        #if ($event.getChild("id").value != "")
+            #set ( $id = $_EscapeTool.javascript($event.getChild("id").value) )
+        #end
+        
+        #if ($event.getChild("summary").value != "")
+            #set ( $summary = $event.getChild("summary").value )
+            #set ( $summary = "#cleanString($summary)" )
+            #set ( $summary = $_EscapeTool.javascript($_DisplayTool.stripTags($summary.trim())) )
+            #set ( $summary = $_DisplayTool.truncate($summary,200,"...",true) )
+        #end
+        
+        #if ($event.getChild("location").value != "")
+            #set ( $location = $_EscapeTool.javascript($event.getChild("location").value) )
+        #end
+        
+        #if ($event.getChild("url").value != "" && $event.getChild("url").value.indexOf("--") == -1)
+            #set ( $url = $event.getChild("url").value )
+            #set ( $url = "#cleanString($url)" )
+            #set ( $url = $url.trim() )
+        #end   
+        
+        #if ($event.getChild("allDay").value != "")
+            #set ( $allDay = $event.getChild("allDay").value )
+        #end  
+            
+        #if ($categories.size() > 0)
+            #set ( $className = "[" )
+            #foreach ($c in $categories)
+                #set ( $cat = $c.value.replaceAll(" ", "_") )
+                #set ( $className = "${className}getClassName('${cat}')" )#if ($foreach.hasNext())#set ( $className = "${className}," )#end
+            #end
+            #set ( $className = "${className}]" )
+        #end
+        
+        {
+            title: '${title}',
+            start: ${start},
+            id: '${id}',
+            summary: '${summary}',
+            location: '${location}',
+            url: '${url}',
+            end: ${end},
+            allDay: ${allDay},
+            className: ${className}
+        }
+    #end
+#end
+
+#*
+    Outputs the JavaScript object representation of an RSS item in the form of:
+
+    <item>
+        <title></title>
+        <pubDate></pubDate>
+        <link></link>
+        <guid></guid>
+    </item>
+
+    @param  $item RSS item
+*#
+#macro ( rssItemToJS $item )
+    #set ( $title = $item.getChild("title").value )
+    #set ( $title = "#cleanString($title)" )
+    #set ( $title = $_EscapeTool.javascript($title.trim()) )
+    #set ( $start = $item.getChild("pubDate").value )
+        
+    #if ($title != "" && $start != "")   
+        #set ( $id = $title.hashCode() )
+        #set ( $summary = "" )
+        #set ( $url = "" )
+        
+        #if ($item.getChild("guid").value != "")
+            #set ( $id = $_EscapeTool.javascript($event.getChild("guid").value) )
+        #end
+        
+        #if ($item.getChild("description").value != "")
+            #set ( $summary = $item.getChild("description").value )
+            #set ( $summary = "#cleanString($summary)" )
+            #set ( $summary = $_EscapeTool.javascript($_DisplayTool.stripTags($summary.trim())) )
+            #set ( $summary = $_DisplayTool.truncate($summary,200,"...",true) )
+        #end
+
+        #if ($item.getChild("link").value != "" && $item.getChild("link").value.indexOf("--") == -1)
+            #set ( $url = $item.getChild("link").value )
+            #set ( $url = "#cleanString($url)" )
+            #set ( $url = $url.trim() )
+        #end
+        
+        {
+            title: '${title}',
+            start: timestampToUnix(Date.parse("${start}")),
+            id: '${id}',
+            summary: '${summary}',
+            location: "",
+            url: '${url}',
+            end: timestampToUnix(Date.parse("${start}")),
+            allDay: true,
+            className: []
+        }
+    #end
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an external XML or JSON events file has completed.
+
+    Events should be in the following format:
+
+    XML:
+    <event>
+        <id></id>
+        <title></title>
+        <start></start>
+        <url></url>
+    </event>
+
+    JSON:
+    {
+        id: "ID",
+        title: "TITLE",
+        start: UNIX_TIMESTAMP,
+        url: "URL"
+    }
+
+    Note: Start should be a 13 digit unix timestamp.
+*#
+#macro ( yqlJsonXmlJs )
+    calendar.FC..fullCalendar("addEventSource", {
+        events: function(start, end, timezone, callback) {
+            var events = [];
+            try {
+                if (data.query.count > 0) {
+                    if (data.query.results.events.event.length === undefined) {
+                        data.query.results.events.event = [data.query.results.events.event];
+                    }
+                    $.each(data.query.results.events.event, function () {
+                        var start = timestampToUnix(this.start),
+                            event = {
+                                title: this.title,
+                                start: start,
+                                id: this.id || this.title.hashCode(),
+                                summary: this.title || "",
+                                location: this.location || "",
+                                url: this.url ||"",
+                                end: timestampToUnix(this.end) || start,
+                                allDay: this.allDay || true,
+                                className: this.categories || []
+                            };
+                        
+                        if (event.allDay !== true || event.allDay !== "true") {
+                            event.className.push("fixedtime")
+                        }
+                        
+                        events.push(event);
+                    });  
+                }
+            } catch (e) {}
+            callback(events);
+        },
+        className: calendar._getCategoryCSSClass("${sourceCategory}")
+    });
+#end
+
+#*
+    Outputs the contents of a JavaScript callback that is executed when querying
+    YQL for an RSS feed has completed.
+*#
+#macro ( yqlRssJs )
+    calendar.FC..fullCalendar("addEventSource", {
+        events: function(start, end, timezone, callback) {
+            var events = [];
+            try {
+                if (data.query.count > 0) {
+                    if (data.query.results.item.length === undefined) {
+                        data.query.results.item = [data.query.results.item];
+                    }
+                    $.each(data.query.results.item, function () {
+                        var start = timestampToUnix(Date.parse(this.pubDate)),
+                              event = {
+                                  title: this.title,
+                                  start: start,
+                                  id: this.guid.content || this.title.hashCode(),
+                                  summary: this.description || "",
+                                  location: "",
+                                  url: this.link ||"",
+                                  end: start,
+                                  allDay: true,
+                                  className: []
+                              };
+                        events.push(event);
+                    });  
+                }
+            } catch (e) {}
+            callback(events);
+        },
+        className: calendar._getCategoryCSSClass("${sourceCategory}")
+    });
+#end
