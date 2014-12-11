@@ -139,6 +139,7 @@
             events.each(function (index) {
                 var event = $(this);
                 var categories = event.attr("${listingCategoriesAttribute}");
+                if (!categories) categories = "";
                 var cats = categories.split(',');
                 var addToList = true;
                 for (var ci = 0; ci < cats.length; ci++) {
