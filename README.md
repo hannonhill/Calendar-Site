@@ -42,7 +42,23 @@ Features include:
 - #### sort-events.xml
 
   The [sort-events XSLT Format](sort-events.xml) is applied at either the Template or Configuration Set Level to sort those events being pulled into other Sites.
-  
+
+CSS:
+- Updated to bootstrap-min.css from v2.2.2 to v4.0.0.
+- Updated fullcalendar.css and fullcalendar.print.css from v2.2.3 to v3.4.0.
+- Removed bootstrap-responsive.css
+- Modified calendar-extra.css  and main.css to reflect changes in framework version.
+JS:
+- Modified jquery.hhcalendar.js to reflect changes in updated framework version and disable old theme.
+Bug Fixes and Improvements:
+- Full Calendar is now fully responsive.
+- Modified several formats to reflect new framework CSS version.
+- Fixed iCal error: “Document is empty” on full calendar.
+- Fixed bug with PDF output breaking when more than one item is to be displayed on term listing; created term listing - pdf.vm
+- Fixed bug with RSS external sources on category listing.
+- Modified formats external-source-common.vm, category and term listing.vm,  for general improvements.
+- Eliminated the need for XSLT to sort recurring events in term listing’s PDF output.
+- General CSS improvements.
 
 
 
