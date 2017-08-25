@@ -59,7 +59,6 @@ Bug Fixes and Improvements:
 - Fixed bug with PDF output breaking when more than one item is to be displayed on term listing; created term listing - pdf.vm
 - Fixed bug with RSS external sources on category listing.
 - Modified formats external-source-common.vm, category and term listing.vm,  for general improvements.
-- Eliminated the need for XSLT to sort recurring events in term listing’s PDF output.
 - General CSS improvements.
 
 
