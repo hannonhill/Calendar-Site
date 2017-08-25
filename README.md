@@ -48,8 +48,10 @@ CSS:
 - Updated fullcalendar.css and fullcalendar.print.css from v2.2.3 to v3.4.0.
 - Removed bootstrap-responsive.css
 - Modified calendar-extra.css  and main.css to reflect changes in framework version.
+
 JS:
 - Modified jquery.hhcalendar.js to reflect changes in updated framework version and disable old theme.
+
 Bug Fixes and Improvements:
 - Full Calendar is now fully responsive.
 - Modified several formats to reflect new framework CSS version.
