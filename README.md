@@ -13,6 +13,12 @@ Features include:
 
 **Note:** This version makes use of the Velocity `#import` directive. For best results, import into an instance of Cascade running version 7.6 or greater; otherwise, the Formats being imported will need to be copied into the Format performing the import. Results may vary importing into 7.0.x, because of potential database structure changes and updates to how Dynamic Metadata are created/stored.
 
+## Before using: 
+- Please go to the format located at /_cascade/formats/full calendar script and make the following changes to lines 41 thru 48:
+	1) Remove the system ID numbers from the system asset tags including the colon.
+	2) Remove the site name from the path of the scripts to make this a relative path.
+
+
 ## Documentation
 
 - [Repeating event options](docs/repeat-options.md)
