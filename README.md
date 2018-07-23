@@ -44,22 +44,24 @@ Features include:
   The [sort-events XSLT Format](sort-events.xml) is applied at either the Template or Configuration Set Level to sort those events being pulled into other Sites.
 
 CSS:
-- Updated to bootstrap-min.css from v2.2.2 to v4.0.0.
-- Updated fullcalendar.css and fullcalendar.print.css from v2.2.3 to v3.4.0.
+- Updated fullcalendar.css and fullcalendar.print.css from v3.4.0 to v3.9.0.
 - Removed bootstrap-responsive.css
-- Modified calendar-extra.css  and main.css to reflect changes in framework version.
+- Modified calendar-extra.css and main.css to reflect changes in framework version & removed commented out styles.
 
 JS:
-- Modified jquery.hhcalendar.js to reflect changes in updated framework version and disable old theme.
+- Modified jquery.hhcalendar.js to utilize the list view options for week and day calendars.
+- Updated fullcalendar.min.js from v2.2.3 to v3.9.0.
+- Updated gcal.js from v.2.2.3 to v3.9.0.
+- Replaced jquery-ui-1.8.23.custom.min.js with jquery-ui.min.js (v1.12.1).
+- Replaced jquery-1.8.1.min.js with jquery.min.js (v3.3.1).
+- Updated moment.min.js from v2.8.4 to latest version.
+
 
 Bug Fixes and Improvements:
 - Full Calendar is now fully responsive.
 - Modified several formats to reflect new framework CSS version.
-- Fixed iCal error: “Document is empty” on full calendar.
-- Fixed bug with PDF output breaking when more than one item is to be displayed on term listing; created term listing - pdf.vm
-- Fixed bug with RSS external sources on category listing.
-- Modified formats external-source-common.vm, category and term listing.vm,  for general improvements.
-- General CSS improvements.
+- Added protect tags around document type for templates that may be affected by sorting XSLT format.
+- Added list views for week and day view.
 
 
 
