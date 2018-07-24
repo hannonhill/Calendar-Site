@@ -60,7 +60,7 @@ JS:
 Bug Fixes and Improvements:
 - Full Calendar is now fully responsive.
 - Modified several formats to reflect new framework CSS version.
-- Fixed bug where dates where not showing in event popup.
+- Fixed bug where dates were not showing in event popup.
 - Added protect tags around document type for templates that may be affected by sorting XSLT format.
 - Added list views for week and day view.
 
