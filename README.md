@@ -61,7 +61,7 @@ Bug Fixes and Improvements:
 - Full Calendar is now fully responsive.
 - Modified several formats to reflect new framework CSS version.
 - Fixed bug where single all-day events do not show up if there's an end date specified.
-- Modified the display of timestamp on all day events.
+- Modified the display of timestamp for all day events.
 - Fixed broken smart fields for event page's data definition.
 - Fixed bug where dates were not showing in event popup.
 - Added protect tags around document type for templates that may be affected by sorting XSLT format.
