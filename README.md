@@ -1,3 +1,7 @@
+# ARCHIVED
+
+This repository has been archived and is no longer actively maintained. A new version of the calendar can be found at https://www.hannonhill.com/resources/exchange/resources/calendar-site.html
+
 # Calendar
 
 Features include:
